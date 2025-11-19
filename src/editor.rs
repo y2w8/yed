@@ -1,7 +1,7 @@
 use std::io::{Write, stdout};
 
 use anyhow::Ok;
-use crossterm::{ExecutableCommand, QueueableCommand, cursor, event::{self, read}, style::{self, Color, Stylize, style}, terminal};
+use crossterm::{ExecutableCommand, QueueableCommand, cursor, event::{self, read}, style::{self, Color, Stylize}, terminal};
 
 enum Action {
     Quit,
@@ -64,7 +64,7 @@ impl Editor {
     }
 
     pub fn draw_statuline(&mut self) -> anyhow::Result<()> {
-        let (bg, fg) = ("#fff", "#000");
+        // let (bg, fg) = ("#fff", "#000");
         let mode = format!(" {:?} ", self.mode).to_uppercase();
         let file = " src/main.rs ";
         let pos = format!(" {}:{} ", self.cy, self.cx);
