@@ -3,7 +3,7 @@ use std::io::{Write, stdout};
 use anyhow::Ok;
 use crossterm::{ExecutableCommand, QueueableCommand, cursor, event::{self, read}, style::{self, Color, Stylize}, terminal};
 
-use crate::buffer::Buffer;
+use crate::{buffer::Buffer};
 
 enum Action {
     Quit,
@@ -29,17 +29,11 @@ pub struct Editor {
     stdout: std::io::Stdout,
     buffer: Buffer,
     size: (u16, u16),
+    vtop: u16,
+    vleft: u16,
     cx: u16,
     cy: u16,
     mode: Mode,
-}
-
-impl Drop for Editor {
-    fn drop(&mut self) {
-        _ = self.stdout.flush();
-        _ = self.stdout.execute(terminal::LeaveAlternateScreen);
-        _ = terminal::disable_raw_mode();
-    }
 }
 
 impl Editor {
@@ -49,18 +43,34 @@ impl Editor {
         stdout
             .execute(terminal::EnterAlternateScreen)?
             .execute(terminal::Clear(terminal::ClearType::All))?;
+
         Ok(Editor {
             stdout,
             buffer,
             size: terminal::size()?,
+            vtop: 0,
+            vleft: 0,
             cx: 0,
             cy: 0,
             mode: Mode::Normal,
         })
     }
 
+    pub fn vwidth(&self) -> u16 {
+        self.size.0
+    }
+
+    pub fn vheight(&self) -> u16 {
+        self.size.1 - 2
+    }
+
+    pub fn viewport_line(&self, n: u16) -> Option<String> {
+    let buffer_line = self.vtop + n;
+    self.buffer.get(buffer_line as usize)
+}
+
     pub fn draw(&mut self) -> anyhow::Result<()> {
-        self.draw_buffer()?;
+        self.draw_viewport()?;
         self.draw_statuline()?;
         self.stdout.queue(cursor::MoveTo(self.cx, self.cy))?;
         self.stdout.flush()?;
@@ -68,12 +78,18 @@ impl Editor {
         Ok(())
     }
 
-    pub fn draw_buffer(&mut self) -> anyhow::Result<()> {
-        for (i, line) in self.buffer.lines.iter().enumerate() {
-            self.stdout.queue(cursor::MoveTo(0, i as u16))?;
-            self.stdout.queue(style::Print(line))?;
-        }
+    pub fn draw_viewport(&mut self) -> anyhow::Result<()> {
+        let vwidth = self.vwidth() as usize;
+        for i in 0..self.vheight() {
+            let line = match self.viewport_line(i) {
+                None => String::new(),
+                Some(s) => s,
+            };
 
+            self.stdout
+                .queue(cursor::MoveTo(0, i))?
+                .queue(style::Print(format!("{line:<width$}", width = vwidth)))?;
+        }
         Ok(())
     }
 
@@ -182,5 +198,13 @@ impl Editor {
             _ => Ok(None),
         };
         Ok(action)?
+    }
+}
+
+impl Drop for Editor {
+    fn drop(&mut self) {
+        _ = self.stdout.flush();
+        _ = self.stdout.execute(terminal::LeaveAlternateScreen);
+        _ = terminal::disable_raw_mode();
     }
 }
